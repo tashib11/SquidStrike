@@ -48,19 +48,26 @@ The game features a sophisticated **Minimax algorithm with Alpha-Beta pruning** 
 
 ### 🎨 Visual Features
 
-- Beautiful checkerboard design with gradient tiles
-- Health bars with color-coded status (green → yellow → red)
-- Smooth animations and visual effects
-- Selection highlights and movement indicators
-- Game over popup with victory animations
-- Sound effects for actions (fire, reload, movement, death)
-- Background music
+- **Beautiful checkerboard design** with gradient tiles (light and dark shades)
+- **Enhanced health bars** with gradient colors (green → yellow → red)
+- **Shadow effects** on pieces for depth perception
+- **Glow effects** on selected pieces with rounded borders
+- **Movement indicators** with pulsing circles for valid moves
+- **Crosshair targeting** for shooting phase with visual feedback
+- **Game over popup** with trophy/star decorations and gradient buttons
+- **UI panel** at bottom showing turn indicator and team status
+- **Real-time health updates** visible during gameplay
+- **Background colors** optimized for better contrast (50, 55, 65 RGB)
 
 ### 🎵 Audio
 
-- Background music for immersive gameplay
-- Sound effects for all major actions
-- Volume-controlled audio system
+- **Background music** for immersive gameplay (looping, volume-controlled)
+- **Sound effects** for all major actions:
+  - Fire sound when shooting
+  - Reload sound when moving
+  - Piece placement sound on selection
+  - Death sound when pieces are eliminated
+- Volume-controlled audio system (background music at 10% volume)
 
 ---
 
@@ -92,7 +99,17 @@ pip install pygame
 AI_Project/
 ├── main.py
 ├── README.md
+├── demo/
+│   ├── war.png
+│   └── war2.png
 └── res/
+    ├── circle_red.png
+    ├── circle_blue.png
+    ├── square_red.png
+    ├── square_blue.png
+    ├── triangle_red.png
+    ├── triangle_blue.png
+    ├── health_pickup.png
     ├── Sounds/
     │   ├── fire.mp3
     │   ├── reload.mp3
@@ -142,6 +159,28 @@ Each turn consists of two phases:
 | 🟦 **Square**   | Diagonal directions (⤡⤢)   | 1-2 squares |
 | 🔺 **Triangle** | All 8 directions           | 1 square    |
 
+### Team Composition
+
+Each team consists of 5 pieces with assigned weapons:
+
+**Red Team** (Starts at top, rows 0):
+
+- Position 0: Circle + Short Gun
+- Position 1: Square + Long Gun
+- Position 2: Triangle + Blast Gun (Center piece)
+- Position 3: Square + Long Gun
+- Position 4: Circle + Short Gun
+
+**Blue Team** (Starts at bottom, row 9):
+
+- Position 0: Circle + Short Gun
+- Position 1: Square + Long Gun
+- Position 2: Triangle + Blast Gun (Center piece)
+- Position 3: Square + Long Gun
+- Position 4: Circle + Short Gun
+
+_Both teams have identical compositions for fair gameplay. Turn order is randomized at game start._
+
 ### Weapon Types
 
 | Weapon           | Range        | Damage     | Special                     |
@@ -152,18 +191,61 @@ Each turn consists of two phases:
 
 **Blast Gun Damage:**
 
-- Direct hit: 29 HP
-- Adjacent (1 square): 14 HP
-- Diagonal (2 squares): 7 HP
+- Direct hit (0 distance): 29 HP (near-lethal)
+- Adjacent (1 Manhattan distance): 14 HP
+- Diagonal corners (2 Manhattan distance): 7 HP
+- **Warning**: Blast gun damages ALL pieces in range, including friendly units!
+
+### Game Mechanics Details
+
+**Movement Rules:**
+
+- Pieces cannot move through other pieces (blocked paths)
+- Circles/Squares can move 2 squares if path is clear
+- Each piece must move before shooting (no stationary shots)
+
+**Shooting Rules:**
+
+- All shots require line of sight (no shooting through pieces for regular guns)
+- Blast gun always fires at exactly 2 squares distance in cardinal directions
+- Blast gun can damage multiple pieces in its area of effect
+- Regular guns (short/long) deal 10 HP damage per hit
+
+**Turn Structure:**
+
+1. AI selects a piece
+2. AI calculates valid moves from current position
+3. AI moves to chosen position
+4. AI calculates valid shots from new position
+5. AI shoots at chosen target
+6. Turn switches to opponent
 
 ### Health System
 
 - Each piece starts with **30 HP**
 - Health bars show current status with color coding:
-  - 🟢 Green: >60% health
-  - 🟡 Yellow: 30-60% health
-  - 🔴 Red: <30% health
-- Health pickups spawn randomly on the board
+  - 🟢 Green: >60% health (18-30 HP)
+  - 🟡 Yellow: 30-60% health (9-17 HP)
+  - 🔴 Red: <30% health (1-8 HP)
+- Health pickups spawn randomly on the board after each turn (not yet implemented for collection)
+- Dead pieces (HP ≤ 0) are removed from play permanently
+
+### Win Conditions
+
+The game ends when:
+
+1. **Elimination Victory**: All pieces of one team are eliminated
+2. **Stalemate**: Both teams have no valid actions for 2 consecutive turns
+   - Winner determined by:
+     - Piece count (more alive pieces wins)
+     - If tied, total health remaining
+     - If still tied, declared a Draw
+
+### Game Controls
+
+- **Mouse Click**: Select pieces, choose moves, and shoot targets
+- **Reset Button**: Restart the game after game over
+- **Exit Button**: Close the game
 
 ### AI Configuration
 
@@ -173,6 +255,7 @@ Modify these variables in `main.py` to customize AI behavior:
 AI_ENABLED = True        # Enable/disable AI vs AI mode
 AI_DELAY = 0.5          # Delay between AI moves (seconds)
 MINIMAX_DEPTH = 3       # Search depth (higher = smarter but slower)
+MAX_NO_ACTIONS = 2      # Consecutive turns without valid actions before stalemate
 ```
 
 ---
@@ -193,15 +276,17 @@ The AI uses a **minimax search tree** with **alpha-beta pruning** to evaluate mo
   2. Deal maximum damage (15 points per enemy HP lost)
   3. Maintain piece count advantage (1000 points per piece advantage)
   4. Preserve own health (5 points per own HP)
+  5. Advance toward enemy territory (2 points per row advancement)
 
 #### Blue AI - Defensive Heuristic
 
 - **Goal**: Survival and opportunistic damage
 - **Priorities**:
-  1. Preserve own pieces (500 points per piece advantage)
-  2. Maintain high health (weighted HP preservation)
-  3. Capitalize on safe kill opportunities (50 point bonus)
-  4. Avoid risky engagements
+  1. Preserve own pieces (800 points per alive piece + 20 points per HP)
+  2. Maintain high health (30 point bonus for pieces with ≥25 HP)
+  3. Defensive positioning (3 points per turn for staying in safe zones)
+  4. Opportunistic damage (5 points per enemy HP lost, 300 per kill)
+  5. Avoid risky engagements and maintain formation
 
 ### Performance
 
@@ -250,24 +335,65 @@ _Tactical positioning and weapon targeting in progress_
 ### Code Structure
 
 ```
-main.py
+main.py (~1500 lines)
 ├── Game Setup & Constants
-├── Graphics & Rendering
-│   ├── draw_board()
-│   ├── draw_piece()
-│   ├── draw_ui_info()
-│   └── draw_game_over_popup()
-├── Game Logic
-│   ├── Movement validation
-│   ├── Shooting mechanics
-│   ├── Health management
-│   └── Win condition checking
-└── AI System
+│   ├── Window configuration (800x860)
+│   ├── Team initialization (pieces, guns, locations, health)
+│   ├── Game state variables
+│   └── Asset loading (images, sounds)
+│
+├── Graphics & Rendering Functions
+│   ├── draw_board() - Checkerboard with grid lines
+│   ├── draw_piece() - Pieces with shadows, health bars, selection highlights
+│   ├── draw_ui_info() - Turn indicator and team status panel
+│   ├── draw_valid() - Movement indicators with pulsing effects
+│   ├── draw_valid_shoot() - Crosshair targeting markers
+│   └── draw_game_over_popup() - Victory screen with buttons
+│
+├── Game Logic Functions
+│   ├── Movement Validation
+│   │   ├── check_option() - Get all valid moves for all pieces
+│   │   ├── check_circle() - Cardinal direction movement (1-2 squares)
+│   │   ├── check_square() - Diagonal movement (1-2 squares)
+│   │   └── check_triangle() - 8-directional movement (1 square)
+│   │
+│   ├── Shooting Mechanics
+│   │   ├── check_shoot() - Get all valid shoot targets
+│   │   ├── check_short_gun() - Straight line shots (1-2 range)
+│   │   ├── check_long_gun() - Diagonal shots (1-2 range)
+│   │   ├── check_blast() - Fixed 2-distance AOE targeting
+│   │   └── blast_damage() - Calculate area damage with friendly fire
+│   │
+│   ├── Health Management
+│   │   ├── check_healths() - Update dead pieces and check win conditions
+│   │   ├── check_stalemate() - Detect no-action stalemates
+│   │   └── spawn_health_pickup() - Random health pickup generation
+│   │
+│   └── Game Control
+│       ├── reset_game() - Reset all variables to initial state
+│       └── Event handling (mouse clicks, buttons)
+│
+└── AI System (Minimax Implementation)
     ├── GameState class
-    ├── minimax_alpha_beta()
-    ├── heuristic_aggressive()
-    ├── heuristic_defensive()
-    └── get_all_possible_actions()
+    │   ├── __init__() - Store board state snapshot
+    │   ├── copy() - Deep copy for simulation
+    │   └── is_terminal() - Check game over condition
+    │
+    ├── simulate_move_and_shoot() - Apply action and return new state
+    │
+    ├── Heuristic Functions
+    │   ├── heuristic_aggressive() - Red AI evaluation (offense-focused)
+    │   └── heuristic_defensive() - Blue AI evaluation (defense-focused)
+    │
+    ├── Action Generation
+    │   └── get_all_possible_actions() - Generate all valid (move, shoot) pairs
+    │
+    ├── Search Algorithm
+    │   ├── minimax_alpha_beta() - Recursive tree search with pruning
+    │   └── ai_decide_action_minimax() - Top-level AI decision maker
+    │
+    └── Game Loop Integration
+        └── Turn-by-turn AI execution with visualization delay
 ```
 
 ---
@@ -307,12 +433,34 @@ Track performance metrics:
 
 Contributions are welcome! Here are some ideas:
 
-- Add new piece types with unique movement patterns
-- Implement new weapon types
-- Create new AI heuristics
-- Add multiplayer networking
-- Improve graphics and animations
-- Add game replays and analysis tools
+**Gameplay Enhancements:**
+
+- Add player vs AI mode with mouse input handling
+- Implement health pickup collection mechanics
+- Add special abilities or power-ups
+- Create new piece types with unique movement patterns
+- Design new weapon types with different mechanics
+
+**AI Improvements:**
+
+- Implement different difficulty levels
+- Add Monte Carlo Tree Search (MCTS) as alternative AI
+- Create tournament mode with multiple AI strategies
+- Add learning/adaptive AI that improves over games
+
+**Visual & Audio:**
+
+- Add particle effects for explosions and hits
+- Implement smooth piece movement animations
+- Create more sound effects and music tracks
+- Add themes/skins for pieces and board
+
+**Technical:**
+
+- Add game replays and save/load functionality
+- Implement multiplayer networking
+- Create AI vs AI tournament statistics
+- Add performance profiling and optimization
 
 ---
 
@@ -328,14 +476,44 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - GitHub: [@tashib11](https://github.com/tashib11)
 - Repository: [SquidStrike](https://github.com/tashib11/SquidStrike)
+- Project Type: AI Lab Assignment (Academic Project)
+- Course: 4-1 Semester, AI Laboratory
 
 ---
 
 ## 🙏 Acknowledgments
 
-- Inspired by Squid Game and classic strategy board games
-- Built with Pygame community support
-- AI concepts from game theory and computer science research
+- **Inspiration**: Squid Game series and classic strategy board games (Chess, Checkers)
+- **Game Engine**: Built with [Pygame](https://www.pygame.org/) - Python game development library
+- **AI Concepts**:
+  - Minimax algorithm from game theory (John von Neumann, 1928)
+  - Alpha-Beta pruning optimization (McCarthy, 1956)
+  - Heuristic evaluation functions from chess engines
+- **Educational Resources**:
+  - Game theory and adversarial search algorithms
+  - Python programming and object-oriented design
+  - Computer graphics and event-driven programming
+
+**Special Thanks**:
+
+- Pygame community for excellent documentation and examples
+- Classic AI game research papers and implementations
+- Strategy game design principles from board game designers
+
+---
+
+## 🎓 Learning Outcomes
+
+This project demonstrates:
+
+- ✅ Implementation of minimax algorithm with alpha-beta pruning
+- ✅ Game state representation and action space modeling
+- ✅ Heuristic function design for different playing styles
+- ✅ Event-driven programming with Pygame
+- ✅ Object-oriented design for game systems
+- ✅ Performance optimization through pruning techniques
+- ✅ User interface design and visualization
+- ✅ Audio integration and resource management
 
 ---
 
@@ -343,6 +521,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### 🌟 Star this repository if you found it helpful!
 
-Made with ❤️ and ☕
+**Perfect for**: AI students, game developers, Python learners, strategy game enthusiasts
+
+Made with ❤️ and ☕ | Built for learning and fun! 🎮
 
 </div>"
