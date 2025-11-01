@@ -1076,6 +1076,7 @@ def simulate_move_and_shoot(state, is_red_turn, piece_idx, new_location, shoot_t
     return new_state
 
 
+
 def heuristic_aggressive(state, is_red_player):
     """
     Improved Aggressive heuristic (for Red AI):
@@ -1091,40 +1092,39 @@ def heuristic_aggressive(state, is_red_player):
         own_alive = len([i for i in range(len(red_pieces)) if i not in state.dead_red])
         enemy_alive = len([i for i in range(len(blue_pieces)) if i not in state.dead_blue])
         
-        # Piece count advantage - BALANCED WEIGHTS
+        # Piece count advantage
         piece_advantage = (own_alive - enemy_alive) * 1000
         
-        # Health advantage (negative enemy health is good) - BALANCED WEIGHTS
+        # Health advantage (negative enemy health is good)
         health_advantage = -enemy_health * 15 + own_health * 5
         
-        # Bonus for low-health enemies (easier to kill) - BALANCED WEIGHTS
+        # Bonus for low-health enemies (easier to kill)
         low_health_bonus = sum(50 if 0 < h <= 15 else 0 for i, h in enumerate(state.blue_healths) if i not in state.dead_blue)
         
         # Positioning: pieces closer to enemy territory score higher
         position_score = 0
-        # for i in range(len(red_pieces)):
-        #     if i not in state.dead_red:
-        #         # Reward advancing forward (higher y value)
-        #         position_score += state.red_locations[i][1] * 2
+        for i in range(len(red_pieces)):
+            if i not in state.dead_red:
+                # Reward advancing forward (higher y value)
+                position_score += state.red_locations[i][1] * 2
         
         score = piece_advantage + health_advantage + low_health_bonus + position_score
     else:
-        # Blue perspective - BALANCED WEIGHTS (same as Red)
+        # Blue perspective
         own_health = sum(h for i, h in enumerate(state.blue_healths) if i not in state.dead_blue)
         enemy_health = sum(h for i, h in enumerate(state.red_healths) if i not in state.dead_red)
         own_alive = len([i for i in range(len(blue_pieces)) if i not in state.dead_blue])
         enemy_alive = len([i for i in range(len(red_pieces)) if i not in state.dead_red])
         
-        # Fixed: Use same balanced weights as Red for fair competition
         piece_advantage = (own_alive - enemy_alive) * 1000
         health_advantage = -enemy_health * 15 + own_health * 5
         low_health_bonus = sum(50 if 0 < h <= 15 else 0 for i, h in enumerate(state.red_healths) if i not in state.dead_red)
         
         position_score = 0
-        # for i in range(len(blue_pieces)):
-        #     if i not in state.dead_blue:
-        #         # Reward advancing forward (lower y value)
-        #         position_score += (9 - state.blue_locations[i][1]) * 2
+        for i in range(len(blue_pieces)):
+            if i not in state.dead_blue:
+                # Reward advancing forward (lower y value)
+                position_score += (9 - state.blue_locations[i][1]) * 2
         
         score = piece_advantage + health_advantage + low_health_bonus + position_score
     
@@ -1139,36 +1139,46 @@ def heuristic_defensive(state, is_red_player):
     - Secondary goal: opportunistic damage
     - Avoid risky moves
     """
-    
     if is_red_player:
         own_health = sum(h for i, h in enumerate(state.red_healths) if i not in state.dead_red)
         enemy_health = sum(h for i, h in enumerate(state.blue_healths) if i not in state.dead_blue)
         own_alive = len([i for i in range(len(red_pieces)) if i not in state.dead_red])
         enemy_alive = len([i for i in range(len(blue_pieces)) if i not in state.dead_blue])
         
-        # Balanced weights - same scale as aggressive
-        piece_advantage = (own_alive - enemy_alive) * 500
-        health_advantage = -enemy_health * 100 + own_health * 5
-        low_health_bonus = sum(50 if 0 < h <= 15 else 0 for i, h in enumerate(state.blue_healths) if i not in state.dead_blue)
+        # Heavy weight on own survival
+        survival_score = own_alive * 800 + own_health * 20
         
+        # Moderate weight on damaging enemies
+        damage_score = -enemy_health * 5 + (len(blue_pieces) - enemy_alive) * 300
+        
+        # Bonus for keeping pieces at full/high health
+        high_health_bonus = sum(30 if h >= 25 else 0 for i, h in enumerate(state.red_healths) if i not in state.dead_red)
+        
+        # Positioning: prefer safer positions (back rows)
         position_score = 0
+        for i in range(len(red_pieces)):
+            if i not in state.dead_red:
+                # Prefer staying back (lower y value for safety)
+                position_score += (5 - state.red_locations[i][1]) * 3 if state.red_locations[i][1] <= 5 else 0
         
-        score = piece_advantage + health_advantage + low_health_bonus + position_score
+        score = survival_score + damage_score + high_health_bonus + position_score
     else:
-        # Blue perspective - BALANCED WEIGHTS (same as Red)
         own_health = sum(h for i, h in enumerate(state.blue_healths) if i not in state.dead_blue)
         enemy_health = sum(h for i, h in enumerate(state.red_healths) if i not in state.dead_red)
         own_alive = len([i for i in range(len(blue_pieces)) if i not in state.dead_blue])
         enemy_alive = len([i for i in range(len(red_pieces)) if i not in state.dead_red])
         
-        # Balanced weights - same scale as aggressive
-        piece_advantage = (own_alive - enemy_alive) * 500
-        health_advantage = -enemy_health * 100 + own_health * 5
-        low_health_bonus = sum(50 if 0 < h <= 15 else 0 for i, h in enumerate(state.red_healths) if i not in state.dead_red)
+        survival_score = own_alive * 800 + own_health * 20
+        damage_score = -enemy_health * 5 + (len(red_pieces) - enemy_alive) * 300
+        high_health_bonus = sum(30 if h >= 25 else 0 for i, h in enumerate(state.blue_healths) if i not in state.dead_blue)
         
         position_score = 0
+        for i in range(len(blue_pieces)):
+            if i not in state.dead_blue:
+                # Prefer staying back (higher y value for safety)
+                position_score += (state.blue_locations[i][1] - 4) * 3 if state.blue_locations[i][1] >= 4 else 0
         
-        score = piece_advantage + health_advantage + low_health_bonus + position_score
+        score = survival_score + damage_score + high_health_bonus + position_score
     
     return score
 
